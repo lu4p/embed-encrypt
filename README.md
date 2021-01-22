@@ -7,7 +7,7 @@ The goal is to be as easy to use as the `embed` package, while providing
 
 ### If you have an older go version
 
-To install the 1.16. beta just run:
+To install the Go 1.16. beta just run:
 ```
 go get golang.org/dl/go1.16beta1
 go1.16beta1 download
