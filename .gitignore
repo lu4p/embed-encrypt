@@ -1,0 +1,4 @@
+embed-encrypt
+.fskey
+*.enc
+.vscode
