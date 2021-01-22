@@ -5,9 +5,9 @@ The goal is to be as easy to use as the `embed` package, while providing
 
 **Note:** You will need the go 1.16 beta1 or newer to use this.
 
-### I have an older go version
+### If you have an older go version
 
-Don't worry installing the 1.16. beta is easy, just run:
+To install the 1.16. beta just run:
 ```
 go get golang.org/dl/go1.16beta1
 go1.16beta1 download
