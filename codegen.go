@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"io/ioutil"
+	"os"
 )
 
 const repo = "github.com/lu4p/embed-encrypt"
+
+var i = 0
 
 func generateCode(pkgName string, directives []directive) error {
 	b := bytes.NewBuffer(nil)
@@ -39,7 +41,7 @@ func generateCode(pkgName string, directives []directive) error {
 		return err
 	}
 
-	return ioutil.WriteFile("encrypted_fs.go", formatted, 0666)
+	return os.WriteFile("encrypted_fs.go", formatted, 0666)
 }
 
 func needsEmbed(directives []directive) bool {
@@ -53,19 +55,18 @@ func needsEmbed(directives []directive) bool {
 }
 
 func initCode(b *bytes.Buffer, d directive) {
-	b.WriteString("func init(){\n")
-
+	i++
 	fmt.Fprintf(b, "//go:embed %v\n", filesString(d.files))
+	fmt.Fprintf(b, "var enc%d %v\n", i, d.typ)
 
-	fmt.Fprintf(b, "var enc %v\n", d.typ)
-
+	b.WriteString("func init(){\n")
 	switch d.typ {
 	case "string":
-		fmt.Fprintf(b, "%v = encryptedfs.DecString(enc, key)", d.identifier)
+		fmt.Fprintf(b, "%v = encryptedfs.DecString(enc%d, key)", d.identifier, i)
 	case "[]byte":
-		fmt.Fprintf(b, "%v = encryptedfs.DecByte(enc, key)", d.identifier)
+		fmt.Fprintf(b, "%v = encryptedfs.DecByte(enc%d, key)", d.identifier, i)
 	case "embed.FS":
-		fmt.Fprintf(b, "%v = encryptedfs.InitFS(enc, key)", d.identifier)
+		fmt.Fprintf(b, "%v = encryptedfs.InitFS(enc%d, key)", d.identifier, i)
 	}
 
 	b.WriteString("}\n")
