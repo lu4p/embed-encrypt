@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/fs"
 	"log"
 
@@ -29,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println(len(gopher))
+	log.Println(hello, len(gopher), multiplefiles)
 
-	fmt.Println(string(c))
+	log.Println(string(c))
 }
