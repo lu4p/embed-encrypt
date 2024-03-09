@@ -10,8 +10,10 @@ import (
 	"time"
 )
 
+const ENC = ".enc"
+
 func remSuffix(name string) string {
-	return strings.TrimSuffix(name, ".enc")
+	return strings.TrimSuffix(name, ENC)
 }
 
 var (
@@ -57,7 +59,7 @@ func InitFS(eFS embed.FS, key []byte) FS {
 
 // Open opens the named file for reading and returns it as an fs.File.
 func (f FS) Open(name string) (fs.File, error) {
-	file, err := f.underlying.Open(name + ".enc")
+	file, err := f.underlying.Open(name + ENC)
 	if err != nil {
 		return nil, err
 	}

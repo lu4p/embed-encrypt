@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const ENC = ".enc"
+
 func main() {
 
 	name, directives, err := findDirectives()
@@ -27,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	const keyname = "key.enc"
+	const keyname = "key" + ENC
 	key, err := os.ReadFile(keyname)
 	if err != nil {
 		log.Fatal(err)
@@ -81,7 +83,7 @@ func encryptFile(name string, key []byte) error {
 		return err
 	}
 
-	return os.WriteFile(name+".enc", encData, info.Mode())
+	return os.WriteFile(name+ENC, encData, info.Mode())
 }
 
 func encryptFiles(filenames []string, key []byte) error {
@@ -172,7 +174,7 @@ func findDirectives() (string, []directive, error) {
 				}
 
 				dir.typ = fmt.Sprint(spec.Type)
-				if strings.Contains(dir.typ, "encryptedfs") {
+				if strings.Contains(dir.typ, "encryptedfs FS") || strings.Contains(dir.typ, "embed FS") {
 					dir.typ = "embed.FS"
 				} else if strings.Contains(dir.typ, "byte") {
 					dir.typ = "[]byte"
@@ -208,8 +210,11 @@ func directives2Files(directives []directive) error {
 			if err != nil {
 				return err
 			}
-
-			directives[i].files = append(directives[i].files, matches...)
+			for _, file := range matches {
+				if !strings.HasSuffix(file, ENC) {
+					directives[i].files = append(directives[i].files, strings.ReplaceAll(file, "\\", "/"))
+				}
+			}
 		}
 	}
 

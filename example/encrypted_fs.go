@@ -5,7 +5,7 @@ package main
 import (
 	"embed"
 	"github.com/abakum/embed-encrypt/encryptedfs"
-	"github.com/abakum/embed-encrypt/example/internal/tool"
+	"internal/tool"
 )
 
 var key []byte

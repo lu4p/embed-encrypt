@@ -47,7 +47,7 @@ func generateCode(pkgName string, directives []directive) error {
 		return err
 	}
 
-	return os.WriteFile("encrypted_fs.go", formatted, 0666)
+	return os.WriteFile("encrypted_fs.go", formatted, 0600)
 }
 
 func needsEmbed(directives []directive) bool {
@@ -81,7 +81,7 @@ func initCode(b *bytes.Buffer, d directive) {
 func filesString(files []string) string {
 	out := ""
 	for _, file := range files {
-		out += fmt.Sprintf("%q ", file+".enc")
+		out += fmt.Sprintf("%q ", file+ENC)
 	}
 
 	return out
