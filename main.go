@@ -9,7 +9,6 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 )
 
 func main() {
+
 	name, directives, err := findDirectives()
 	if err != nil {
 		log.Fatal(err)
@@ -27,8 +27,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	const keyname = "key.enc"
+	key, err := os.ReadFile(keyname)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for _, dir := range directives {
-		err := encryptFiles(dir.files)
+		err := encryptFiles(dir.files, key)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -48,7 +54,7 @@ func encryptFile(name string, key []byte) error {
 
 	defer f.Close()
 
-	content, err := ioutil.ReadAll(f)
+	content, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -75,24 +81,10 @@ func encryptFile(name string, key []byte) error {
 		return err
 	}
 
-	return ioutil.WriteFile(name+".enc", encData, info.Mode())
+	return os.WriteFile(name+".enc", encData, info.Mode())
 }
 
-const keyname = ".fskey"
-
-func encryptFiles(filenames []string) error {
-	key, err := ioutil.ReadFile(keyname)
-	if err != nil {
-		key = make([]byte, 16)
-		if _, err := io.ReadFull(rand.Reader, key); err != nil {
-			return fmt.Errorf("key couldn't be generated: %w", err)
-		}
-
-		if err := ioutil.WriteFile(keyname, key, 0666); err != nil {
-			return fmt.Errorf("key couldn't be written: %w", err)
-		}
-	}
-
+func encryptFiles(filenames []string, key []byte) error {
 	for _, name := range filenames {
 		if err := encryptFile(name, key); err != nil {
 			return err

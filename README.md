@@ -3,19 +3,19 @@ This program wraps the newly in Go 1.16 `embed` package, to save files aes encry
 
 The goal is to be as easy to use as the `embed` package, while providing 
 
-**Note:** You will need the go 1.16 beta1 or newer to use this.
+**Note:** You will need the go 1.19 or newer to use this.
 
 ### If you have an older go version
 
-To install the Go 1.16. beta just run:
+To install the Go 1.19 just run:
 ```
-go get golang.org/dl/go1.16beta1
-go1.16beta1 download
+go get golang.org/dl/go1.19
+go1.19 download
 ```
 
 ## How to Install
 ```bash
-go1.16beta1 get github.com/lu4p/embed-encrypt
+go1.19 get github.com/abakum/embed-encrypt
 ```
 
 ## Usage
@@ -31,7 +31,7 @@ embed-encrypt
 or if you haven't added `GOBIN` to your `PATH`
 
 ```bash
-go run github.com/lu4p/embed-encrypt
+go run github.com/abakum/embed-encrypt
 ```
 
 This generates an aes encrypted version for all embedded files, 
@@ -72,7 +72,7 @@ var gopher []byte
 
 
 ## Caveats
-- locally scoped embed variables are not supported, because a seperate file is generated, which needs to manipulate the variables
+- locally scoped embed variables are not supported, in go1.19
 
 ```go
 func main() {

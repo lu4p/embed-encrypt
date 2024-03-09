@@ -4,8 +4,10 @@ import (
 	"io/fs"
 	"log"
 
-	"github.com/lu4p/embed-encrypt/encryptedfs"
+	"github.com/abakum/embed-encrypt/encryptedfs"
 )
+
+//go:generate go run internal/main.go
 
 //go:generate go run ..
 
@@ -15,7 +17,8 @@ var hello string
 //encrypted:embed gopher.png
 var gopher []byte
 
-//encrypted:embed gopher.png
+// encrypted:embed gopher.png
+//
 //encrypted:embed hello.txt "another.txt" "with spaces .txt"
 var multiplefiles encryptedfs.FS
 
