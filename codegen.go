@@ -6,9 +6,9 @@ import (
 	"go/format"
 	"os"
 	"runtime/debug"
-)
 
-var i = 0
+	"github.com/abakum/embed-encrypt/encryptedfs"
+)
 
 func generateCode(pkgName string, directives []directive) error {
 	repo := ""
@@ -21,22 +21,27 @@ func generateCode(pkgName string, directives []directive) error {
 
 	fmt.Fprintln(b, "package", pkgName)
 
-	fmt.Fprintln(b, "import (")
+	b.WriteString("import (")
 	fmt.Fprintf(b, `"%v/encryptedfs"`+"\n", repo)
-	if tool, err := os.ReadFile("tool"); err == nil {
-		fmt.Fprintf(b, `"%s"`+"\n", string(tool))
+	lib, err := os.ReadFile(libEnc)
+	if err == nil {
+		fmt.Fprintf(b, "%q\n", lib)
 	}
 	if needsEmbed(directives) {
-		fmt.Fprintln(b, `"embed"`)
+		b.WriteString(`"embed"`)
 	} else {
-		fmt.Fprintln(b, `_ "embed"`)
+		b.WriteString(`_ "embed"`)
 	}
 	b.WriteString(")\n")
-
-	b.WriteString("var key []byte\n")
-	b.WriteString("func init(){\n")
-	b.WriteString(" key=tool.Priv()\n")
-	b.WriteString("}\n")
+	if err != nil {
+		fmt.Fprintf(b, "//go:embed %v\n", keyEnc)
+	}
+	fmt.Fprintf(b, "var %s []byte\n", varKey)
+	if err == nil {
+		b.WriteString("func init(){\n")
+		fmt.Fprintf(b, " %v\n", varLibFunc)
+		b.WriteString("}\n")
+	}
 
 	for _, d := range directives {
 		initCode(b, d)
@@ -44,6 +49,7 @@ func generateCode(pkgName string, directives []directive) error {
 
 	formatted, err := format.Source(b.Bytes())
 	if err != nil {
+		fmt.Println(b.String())
 		return err
 	}
 
@@ -61,18 +67,17 @@ func needsEmbed(directives []directive) bool {
 }
 
 func initCode(b *bytes.Buffer, d directive) {
-	i++
 	fmt.Fprintf(b, "//go:embed %v\n", filesString(d.files))
-	fmt.Fprintf(b, "var enc%d %v\n", i, d.typ)
+	fmt.Fprintf(b, "var %vEnc %v\n", d.identifier, d.typ)
 
 	b.WriteString("func init(){\n")
 	switch d.typ {
 	case "string":
-		fmt.Fprintf(b, "%v = encryptedfs.DecString(enc%d, key)", d.identifier, i)
+		fmt.Fprintf(b, "%v = encryptedfs.DecString(%vEnc, %v)", d.identifier, d.identifier, varKey)
 	case "[]byte":
-		fmt.Fprintf(b, "%v = encryptedfs.DecByte(enc%d, key)", d.identifier, i)
+		fmt.Fprintf(b, "%v = encryptedfs.DecByte(%vEnc, %v)", d.identifier, d.identifier, varKey)
 	case "embed.FS":
-		fmt.Fprintf(b, "%v = encryptedfs.InitFS(enc%d, key)", d.identifier, i)
+		fmt.Fprintf(b, "%v = encryptedfs.InitFS(%vEnc, %v)", d.identifier, d.identifier, varKey)
 	}
 
 	b.WriteString("}\n")
@@ -81,7 +86,7 @@ func initCode(b *bytes.Buffer, d directive) {
 func filesString(files []string) string {
 	out := ""
 	for _, file := range files {
-		out += fmt.Sprintf("%q ", file+ENC)
+		out += fmt.Sprintf("%q ", file+encryptedfs.ENC)
 	}
 
 	return out

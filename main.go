@@ -13,15 +13,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/abakum/embed-encrypt/encryptedfs"
 )
 
-const ENC = ".enc"
+var (
+	varLibFunc, varKey, keyEnc, libEnc = args(os.Args)
+)
 
 func main() {
-
 	name, directives, err := findDirectives()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(directives) == 0 {
+		os.Exit(0)
 	}
 
 	err = directives2Files(directives)
@@ -29,10 +36,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	const keyname = "key" + ENC
-	key, err := os.ReadFile(keyname)
-	if err != nil {
-		log.Fatal(err)
+	key, err := os.ReadFile(keyEnc)
+	if err != nil || len(key) == 0 {
+		os.Remove(libEnc)
+		key = make([]byte, 16)
+		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+			log.Fatalf("key couldn't be generated: %v", err)
+		}
+
+		if err := os.WriteFile(keyEnc, key, 0666); err != nil {
+			log.Fatalf("key couldn't be written: %v", err)
+		}
 	}
 
 	for _, dir := range directives {
@@ -83,7 +97,7 @@ func encryptFile(name string, key []byte) error {
 		return err
 	}
 
-	return os.WriteFile(name+ENC, encData, info.Mode())
+	return os.WriteFile(name+encryptedfs.ENC, encData, info.Mode())
 }
 
 func encryptFiles(filenames []string, key []byte) error {
@@ -174,7 +188,7 @@ func findDirectives() (string, []directive, error) {
 				}
 
 				dir.typ = fmt.Sprint(spec.Type)
-				if strings.Contains(dir.typ, "encryptedfs FS") || strings.Contains(dir.typ, "embed FS") {
+				if strings.Contains(dir.typ, "encryptedfs") {
 					dir.typ = "embed.FS"
 				} else if strings.Contains(dir.typ, "byte") {
 					dir.typ = "[]byte"
@@ -211,7 +225,7 @@ func directives2Files(directives []directive) error {
 				return err
 			}
 			for _, file := range matches {
-				if !strings.HasSuffix(file, ENC) {
+				if !strings.HasSuffix(file, encryptedfs.ENC) {
 					directives[i].files = append(directives[i].files, strings.ReplaceAll(file, "\\", "/"))
 				}
 			}
@@ -219,4 +233,26 @@ func directives2Files(directives []directive) error {
 	}
 
 	return nil
+}
+
+func args(args []string) (varLibFunc, varKey, keyEnc, libEnc string) {
+	varKey = "key"
+	if len(args) > 1 {
+		varKey = args[1]
+	}
+
+	libKey := "tool"
+	if len(args) > 2 {
+		libKey = args[2]
+	}
+
+	funcKey := "Priv"
+	if len(args) > 3 {
+		funcKey = args[3]
+	}
+
+	keyEnc = varKey + encryptedfs.ENC
+	libEnc = libKey + encryptedfs.ENC
+	varLibFunc = fmt.Sprintf("%s=%s.%s(%q,%q)", varKey, libKey, funcKey, varKey, libKey)
+	return
 }
