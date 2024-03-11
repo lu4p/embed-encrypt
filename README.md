@@ -22,7 +22,7 @@ go1.19 get github.com/abakum/embed-encrypt
 
 Replace your `//go:embed file.txt` directive  with `//encrypted:embed file.txt`,
 the syntax is the same as the embed directives read the embed docs [here](https://pkg.go.dev/embed?utm_source=gopls#hdr-Directives). 
-If you find that the syntax is not 100% compatible to `go:embed` please open an issue.
+Replace your `embed.FS` type  with `encryptedfs.FS`.
 
 After you added the comment directives to some variables run:
 ```bash
@@ -40,21 +40,21 @@ This generates an aes encrypted version for all embedded files,
 ## Supported
 Multiple directives, for a single variable:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 //encrypted:embed hello.txt
 var multipleDirectives encryptedfs.FS
 ```
 
 Multiple files, for a single variable:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 //encrypted:embed hello.txt "another.txt" "with spaces .txt"
 var multipleFiles encryptedfs.FS
 ```
 
 Glob patterns:
 ```go
-//encrypted:embed *.txt
+//encrypted:embed bin/* *.txt
 var glob encryptedfs.FS
 ```
 
@@ -66,7 +66,7 @@ var hello string
 
 Byte slices:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 var gopher []byte
 ```
 
@@ -90,4 +90,3 @@ var (
 	gopher []byte
 )
 ```
-- no tests (will be added shortly)
