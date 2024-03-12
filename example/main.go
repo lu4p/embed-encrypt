@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"log"
+	"os"
 
 	"github.com/abakum/embed-encrypt/encryptedfs"
 )
@@ -34,4 +36,23 @@ func main() {
 	log.Println(hello, len(gopher), len(g))
 	h, err := multiplefiles.ReadFile("hello.txt")
 	log.Println(string(h), err)
+
+	glob.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fi, _ := d.Info()
+		fmt.Println(fi.Mode(), fi.Size(), path)
+		return nil
+	})
+	log.Println(glob.ReadDir("."))
+	log.Println(fs.ReadDir(glob, "."))
+	log.Println(encryptedfs.EmbedList(glob, "."))
+	log.Println(fs.Stat(glob, "bin/gopher.png"))
+
+	cwd, err := os.Getwd()
+	if err == nil {
+		log.Println(encryptedfs.UnloadEmbed(glob, "", cwd, "u", true))
+		log.Println(encryptedfs.UnloadEmbed(glob, "bin", cwd, "u", true))
+	}
 }

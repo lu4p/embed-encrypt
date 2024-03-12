@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const ENC = ".enc"
-
 func remSuffix(name string) string {
 	return strings.TrimSuffix(name, ENC)
 }
@@ -57,9 +55,12 @@ func InitFS(eFS embed.FS, key []byte) FS {
 	}
 }
 
-// Open opens the named file for reading and returns it as an fs.File.
+// Open opens the named file or dir for reading and returns it as an fs.File.
 func (f FS) Open(name string) (fs.File, error) {
-	file, err := f.underlying.Open(name + ENC)
+	file, err := f.underlying.Open(name) //dir
+	if err != nil {
+		file, err = f.underlying.Open(name + ENC) //file
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +110,7 @@ func (f FS) ReadDir(name string) ([]fs.DirEntry, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer file.Close()
 
 		info, _ := file.Stat()
 
