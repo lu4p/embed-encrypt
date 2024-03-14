@@ -36,7 +36,12 @@ func DecByte(encData []byte, key []byte) []byte {
 		panic(err)
 	}
 
-	plaintext, err := aesgcm.Open(nil, encData[:12], encData[12:], nil)
+	mt := MODTIME
+	if encData[NONCE] == timeBinaryVersionV2 {
+		mt++
+	}
+
+	plaintext, err := aesgcm.Open(nil, encData[:NONCE], encData[NONCE+mt:], nil)
 	if err != nil {
 		panic(err)
 	}
@@ -86,14 +91,23 @@ func (f FS) Open(name string) (fs.File, error) {
 		return nil, err
 	}
 
-	plaintext, err := aesgcm.Open(nil, encData[:12], encData[12:], nil)
+	mt := MODTIME
+	if encData[NONCE] == timeBinaryVersionV2 {
+		mt++
+	}
+
+	plaintext, err := aesgcm.Open(nil, encData[:NONCE], encData[NONCE+mt:], nil)
 	if err != nil {
 		return nil, err
 	}
 
+	var modTime time.Time
+	(&modTime).UnmarshalBinary(encData[NONCE : NONCE+mt])
+
 	return &openFile{
 		underlying: file,
 		decrypted:  plaintext,
+		modTime:    modTime,
 	}, nil
 }
 
@@ -135,6 +149,7 @@ type openFile struct {
 	underlying fs.File
 	decrypted  []byte
 	offset     int64
+	modTime    time.Time
 }
 
 func (f *openFile) Read(b []byte) (int, error) {
@@ -158,6 +173,7 @@ func (f *openFile) Stat() (fs.FileInfo, error) {
 	return &fileInfo{
 		underlying:    info,
 		decryptedSize: int64(len(f.decrypted)),
+		modTime:       f.modTime,
 	}, nil
 }
 
@@ -174,12 +190,13 @@ var (
 type fileInfo struct {
 	underlying    fs.FileInfo
 	decryptedSize int64
+	modTime       time.Time
 }
 
 func (f *fileInfo) Name() string               { return remSuffix(f.underlying.Name()) }
 func (f *fileInfo) Size() int64                { return f.decryptedSize }
 func (f *fileInfo) Mode() fs.FileMode          { return f.underlying.Mode() }
-func (f *fileInfo) ModTime() time.Time         { return f.underlying.ModTime() }
+func (f *fileInfo) ModTime() time.Time         { return f.modTime }
 func (f *fileInfo) IsDir() bool                { return f.underlying.IsDir() }
 func (f *fileInfo) Sys() interface{}           { return nil }
 func (f *fileInfo) Type() fs.FileMode          { return f.underlying.Mode().Type() }

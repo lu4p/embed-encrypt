@@ -84,18 +84,24 @@ func encryptFile(name string, key []byte) error {
 	if err != nil {
 		return err
 	}
-
-	nonce := make([]byte, 12)
+	nonce := make([]byte, encryptedfs.NONCE)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
 	}
-
-	encData := append(nonce, gcm.Seal(nil, nonce, content, nil)...)
 
 	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
+
+	// The go:embed does not store ModTime, let's fix it for encrypted:embed
+	modTime, err := info.ModTime().MarshalBinary()
+	if err != nil {
+		return err
+	}
+
+	encData := append(nonce, modTime...)
+	encData = append(encData, gcm.Seal(nil, nonce, content, nil)...)
 
 	return os.WriteFile(name+encryptedfs.ENC, encData, info.Mode())
 }

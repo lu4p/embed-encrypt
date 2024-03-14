@@ -3,3 +3,4 @@ embed-encrypt
 *.exe
 .vscode
 internal
+example/encrypted_fs.go

@@ -2,14 +2,19 @@ package encryptedfs
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-const ENC = ".enc"
+const (
+	ENC                 = ".enc"
+	MODTIME             = /*version*/ 1 + /*sec*/ 8 + /*nsec*/ 4 + /*zone offset*/ 2
+	NONCE               = 12
+	timeBinaryVersionV2 = 2 // For LMT only
+)
 
 // `fs.WalkDir(encryptedfs` do not work replace it with `encryptedfs.WalkDir(`
 func (f FS) WalkDir(root string, fn fs.WalkDirFunc) error {
@@ -35,25 +40,21 @@ func (f FS) WalkDir(root string, fn fs.WalkDirFunc) error {
 func (f *fileInfo) String() string { return fs.FormatFileInfo(f) }
 
 /*
-copy from embed
+	Like xcopy embed:\src root\trg\ /syd
 
 src - name of dir was embed. Root as "."
 
 root - root dir for target
 
-trg - target dir as `root/trg“. If `a` and `b/c` was ebbed, and  root=`/tmp`
+trg - target dir as `root/trg/“. If `a` and `b/c` was embed, and  root=`/tmp`
 
-src="." trg="" then will be `/tmp/a` `/tmp/b/c`
+src="." trg="" then will be `/tmp/a` and `/tmp/b/c`
 
 src="b" trg="" then will be `/tmp/b/c`
 
 src="b" trg="d" then will be `/tmp/d/b/c`
-
-keep == true if not exist then write
-
-keep == false it will be replaced if it differs from the embed
 */
-func UnloadEmbed(bin any, src, root, trg string, keep bool) (fns map[string]string, err error) {
+func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string, err error) {
 	var fsys fs.FS
 	const (
 		FiLEMODE = 0644
@@ -65,18 +66,26 @@ func UnloadEmbed(bin any, src, root, trg string, keep bool) (fns map[string]stri
 	}
 	src = strings.ReplaceAll(src, `\`, "/")
 	srcLen := strings.Count(src, "/")
-	trg = strings.ReplaceAll(trg, `\`, "/")
-	dirs := append([]string{root}, strings.Split(trg, "/")...)
+	dirs := append([]string{strings.ReplaceAll(root, `\`, "/")}, strings.Split(strings.ReplaceAll(trg, `\`, "/"), "/")...)
 	write := func(unix string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		win := filepath.Join(append(dirs, strings.Split(unix, "/")[srcLen:]...)...)
-		fns[strings.TrimPrefix(unix, src+"/")] = win
+		path := filepath.Join(append(dirs, strings.Split(unix, "/")[srcLen:]...)...)
+		fns[strings.TrimPrefix(unix, src+"/")] = path
+		eInfo, _ := fs.Stat(fsys, unix)
+		fInfo, err := os.Stat(path)
+		if err == nil {
+			if fInfo.ModTime().After(eInfo.ModTime()) { // xcopy /d
+				return nil
+			}
+		}
 		if d.IsDir() {
-			_, err = os.Stat(win)
 			if os.IsNotExist(err) {
-				err = os.MkdirAll(win, DIRMODE)
+				err = os.MkdirAll(path, DIRMODE)
+				if err != nil {
+					return err
+				}
 			}
 			return err
 		}
@@ -84,16 +93,22 @@ func UnloadEmbed(bin any, src, root, trg string, keep bool) (fns map[string]stri
 		if err != nil {
 			return err
 		}
-		var size int64
-		fi, err := os.Stat(win)
-		if err == nil {
-			size = fi.Size()
-			if int64(len(bytes)) == size || keep {
-				return nil
-			}
+		err = os.WriteFile(path, bytes, FiLEMODE)
+		if err != nil {
+			return err
 		}
-		log.Println(win, len(bytes), "->", size)
-		return os.WriteFile(win, bytes, FiLEMODE)
+		fi, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		s := fi.Size()
+		l := int64(len(bytes))
+		if l != s {
+			err = fmt.Errorf("writing error to %s, expected %d, was recorded %d", path, l, s)
+			return err
+		}
+		report += fmt.Sprintln(unix, "->", path)
+		return nil
 	}
 	switch efs := bin.(type) {
 	case embed.FS:
@@ -106,8 +121,8 @@ func UnloadEmbed(bin any, src, root, trg string, keep bool) (fns map[string]stri
 	return
 }
 
-// template usage WalkDir for UnloadEmbed
-func EmbedList(bin any, src string) (paths []string, err error) {
+// like src/** case shopt -s globstar
+func GlobStar(bin any, src string) (paths []string, err error) {
 	list := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
