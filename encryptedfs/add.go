@@ -40,7 +40,7 @@ func (f FS) WalkDir(root string, fn fs.WalkDirFunc) error {
 func (f *fileInfo) String() string { return fs.FormatFileInfo(f) }
 
 /*
-	Like xcopy embed:\src root\trg\ /syd
+Like xcopy embed:\src root\trg\ /syd
 
 src - name of dir was embed. Root as "."
 
@@ -75,10 +75,12 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 		fns[strings.TrimPrefix(unix, src+"/")] = path
 		eInfo, _ := fs.Stat(fsys, unix)
 		fInfo, err := os.Stat(path)
+		ts := ""
 		if err == nil {
 			if fInfo.ModTime().After(eInfo.ModTime()) { // xcopy /d
 				return nil
 			}
+			ts = fmt.Sprint(fInfo.ModTime(), " ", fInfo.Size())
 		}
 		if d.IsDir() {
 			if os.IsNotExist(err) {
@@ -107,7 +109,7 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 			err = fmt.Errorf("writing error to %s, expected %d, was recorded %d", path, l, s)
 			return err
 		}
-		report += fmt.Sprintln(unix, "->", path)
+		report += fmt.Sprintln(eInfo.ModTime(), eInfo.Size(), unix, "->", ts, path)
 		return nil
 	}
 	switch efs := bin.(type) {

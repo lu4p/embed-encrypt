@@ -4,3 +4,4 @@ embed-encrypt
 .vscode
 internal
 example/encrypted_fs.go
+copy
