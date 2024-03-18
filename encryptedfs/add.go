@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -77,7 +78,7 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 		fInfo, err := os.Stat(path)
 		ts := ""
 		if err == nil {
-			if fInfo.ModTime().After(eInfo.ModTime()) { // xcopy /d
+			if fInfo.ModTime().Compare(eInfo.ModTime()) >= 0 { // xcopy /d fInfo.ModTime().After(eInfo.ModTime())
 				return nil
 			}
 			ts = fmt.Sprint(fInfo.ModTime(), " ", fInfo.Size())
@@ -109,6 +110,7 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 			err = fmt.Errorf("writing error to %s, expected %d, was recorded %d", path, l, s)
 			return err
 		}
+		os.Chtimes(path, time.Now().Local(), eInfo.ModTime())
 		report += fmt.Sprintln(eInfo.ModTime(), eInfo.Size(), unix, "->", ts, path)
 		return nil
 	}
