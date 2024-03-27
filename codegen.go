@@ -53,7 +53,7 @@ func generateCode(pkgName string, directives []directive) error {
 		return err
 	}
 
-	return os.WriteFile("encrypted_fs.go", formatted, 0600)
+	return os.WriteFile(doNotEdit, formatted, 0600)
 }
 
 func needsEmbed(directives []directive) bool {

@@ -24,10 +24,11 @@ var gopher []byte
 //encrypted:embed hello.txt "another.txt" "with spaces .txt" bin/gopher.png
 var multiplefiles encryptedfs.FS
 
-//encrypted:embed bin/* *.txt
+//encrypted:embed bin *.txt
 var glob encryptedfs.FS
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	g, err := fs.ReadFile(glob, "bin/gopher.png")
 	if err != nil {
 		log.Fatal(err)

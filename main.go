@@ -19,9 +19,13 @@ import (
 
 var (
 	varLibFunc, varKey, keyEnc, libEnc = args(os.Args)
+	doNotEdit                          = "encrypted_fs.go"
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile)
+	os.Remove(doNotEdit)
+
 	name, directives, err := findDirectives()
 	if err != nil {
 		log.Fatal(err)
@@ -221,11 +225,18 @@ func findDirectives() (string, []directive, error) {
 func directives2Files(directives []directive) error {
 	for i, d := range directives {
 		for _, p := range d.patterns {
-			if _, err := os.Stat(p); err == nil {
-				directives[i].files = append(directives[i].files, p)
-				continue
+			info, err := os.Stat(p)
+			if err == nil {
+				if info.IsDir() {
+					p += "/*"
+				} else {
+					directives[i].files = append(directives[i].files, p)
+					continue
+				}
 			}
-
+			if os.IsNotExist(err) {
+				return fmt.Errorf("not found %s", p)
+			}
 			matches, err := filepath.Glob(p)
 			if err != nil {
 				return err
@@ -237,7 +248,7 @@ func directives2Files(directives []directive) error {
 			}
 		}
 	}
-
+	log.Println(directives)
 	return nil
 }
 
