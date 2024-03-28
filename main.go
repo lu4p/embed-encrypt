@@ -9,17 +9,31 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/abakum/embed-encrypt/encryptedfs"
+)
+
+var (
+	varLibFunc, varKey, keyEnc, libEnc = args(os.Args)
+	doNotEdit                          = "encrypted_fs.go"
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile)
+	os.Remove(doNotEdit)
+
 	name, directives, err := findDirectives()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(directives) == 0 {
+		os.Exit(0)
 	}
 
 	err = directives2Files(directives)
@@ -27,8 +41,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+	key, err := os.ReadFile(keyEnc)
+	if err != nil || len(key) == 0 {
+		os.Remove(libEnc)
+		key = make([]byte, 16)
+		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+			log.Fatalf("key couldn't be generated: %v", err)
+		}
+
+		if err := os.WriteFile(keyEnc, key, 0666); err != nil {
+			log.Fatalf("key couldn't be written: %v", err)
+		}
+	}
+
 	for _, dir := range directives {
-		err := encryptFiles(dir.files)
+		err := encryptFiles(dir.files, key)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -48,7 +75,15 @@ func encryptFile(name string, key []byte) error {
 
 	defer f.Close()
 
-	content, err := ioutil.ReadAll(f)
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return nil
+	}
+
+	content, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -62,37 +97,24 @@ func encryptFile(name string, key []byte) error {
 	if err != nil {
 		return err
 	}
-
-	nonce := make([]byte, 12)
+	nonce := make([]byte, encryptedfs.NONCE)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
 	}
 
-	encData := append(nonce, gcm.Seal(nil, nonce, content, nil)...)
-
-	info, err := f.Stat()
+	// The go:embed does not store ModTime, let's fix it for encrypted:embed
+	modTime, err := info.ModTime().MarshalBinary()
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(name+".enc", encData, info.Mode())
+	encData := append(nonce, modTime...)
+	encData = append(encData, gcm.Seal(nil, nonce, content, nil)...)
+
+	return os.WriteFile(name+encryptedfs.ENC, encData, info.Mode())
 }
 
-const keyname = ".fskey"
-
-func encryptFiles(filenames []string) error {
-	key, err := ioutil.ReadFile(keyname)
-	if err != nil {
-		key = make([]byte, 16)
-		if _, err := io.ReadFull(rand.Reader, key); err != nil {
-			return fmt.Errorf("key couldn't be generated: %w", err)
-		}
-
-		if err := ioutil.WriteFile(keyname, key, 0666); err != nil {
-			return fmt.Errorf("key couldn't be written: %w", err)
-		}
-	}
-
+func encryptFiles(filenames []string, key []byte) error {
 	for _, name := range filenames {
 		if err := encryptFile(name, key); err != nil {
 			return err
@@ -207,19 +229,68 @@ func findDirectives() (string, []directive, error) {
 func directives2Files(directives []directive) error {
 	for i, d := range directives {
 		for _, p := range d.patterns {
-			if _, err := os.Stat(p); err == nil {
-				directives[i].files = append(directives[i].files, p)
-				continue
+			info, err := os.Stat(p)
+			if err == nil {
+				if info.IsDir() {
+					// https://pkg.go.dev/embed#hdr-Directives
+					// The difference is that ‘image/*’ embeds ‘image/.tempfile’ while ‘image’ does not.
+					filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+						if err != nil || d.IsDir() {
+							return nil
+						}
+						if base := filepath.Base(path); strings.HasPrefix(base, ".") || strings.HasPrefix(base, "_") || strings.HasSuffix(path, encryptedfs.ENC) {
+							return nil
+						}
+						directives[i].files = append(directives[i].files, strings.ReplaceAll(path, "\\", "/"))
+						return nil
+					})
+					continue
+				} else {
+					directives[i].files = append(directives[i].files, p)
+					continue
+				}
 			}
-
+			if os.IsNotExist(err) {
+				return fmt.Errorf("pattern %s: no matching files found", p)
+			}
 			matches, err := filepath.Glob(p)
 			if err != nil {
 				return err
 			}
-
-			directives[i].files = append(directives[i].files, matches...)
+			for _, file := range matches {
+				if strings.HasSuffix(file, encryptedfs.ENC) {
+					continue
+				}
+				info, err := os.Stat(file)
+				if err != nil || info.IsDir() {
+					continue
+				}
+				directives[i].files = append(directives[i].files, strings.ReplaceAll(file, "\\", "/"))
+			}
 		}
 	}
-
+	log.Println(directives)
 	return nil
+}
+
+func args(args []string) (varLibFunc, varKey, keyEnc, libEnc string) {
+	varKey = "key"
+	if len(args) > 1 {
+		varKey = args[1]
+	}
+
+	libKey := "tool"
+	if len(args) > 2 {
+		libKey = args[2]
+	}
+
+	funcKey := "Priv"
+	if len(args) > 3 {
+		funcKey = args[3]
+	}
+
+	keyEnc = varKey + encryptedfs.ENC
+	libEnc = libKey + encryptedfs.ENC
+	varLibFunc = fmt.Sprintf("%s=%s.%s(%q,%q)", varKey, libKey, funcKey, varKey, libKey)
+	return
 }

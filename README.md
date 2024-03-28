@@ -3,26 +3,26 @@ This program wraps the newly in Go 1.16 `embed` package, to save files aes encry
 
 The goal is to be as easy to use as the `embed` package, while providing 
 
-**Note:** You will need the go 1.16 beta1 or newer to use this.
+**Note:** You will need the go 1.19 or newer to use this.
 
 ### If you have an older go version
 
-To install the Go 1.16. beta just run:
+To install the Go 1.19 just run:
 ```
-go get golang.org/dl/go1.16beta1
-go1.16beta1 download
+go get golang.org/dl/go1.19
+go1.19 download
 ```
 
 ## How to Install
 ```bash
-go1.16beta1 get github.com/lu4p/embed-encrypt
+go1.19 get github.com/abakum/embed-encrypt
 ```
 
 ## Usage
 
 Replace your `//go:embed file.txt` directive  with `//encrypted:embed file.txt`,
 the syntax is the same as the embed directives read the embed docs [here](https://pkg.go.dev/embed?utm_source=gopls#hdr-Directives). 
-If you find that the syntax is not 100% compatible to `go:embed` please open an issue.
+Replace your `embed.FS` type  with `encryptedfs.FS`.
 
 After you added the comment directives to some variables run:
 ```bash
@@ -31,7 +31,7 @@ embed-encrypt
 or if you haven't added `GOBIN` to your `PATH`
 
 ```bash
-go run github.com/lu4p/embed-encrypt
+go run github.com/abakum/embed-encrypt
 ```
 
 This generates an aes encrypted version for all embedded files, 
@@ -40,21 +40,21 @@ This generates an aes encrypted version for all embedded files,
 ## Supported
 Multiple directives, for a single variable:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 //encrypted:embed hello.txt
 var multipleDirectives encryptedfs.FS
 ```
 
 Multiple files, for a single variable:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 //encrypted:embed hello.txt "another.txt" "with spaces .txt"
 var multipleFiles encryptedfs.FS
 ```
 
 Glob patterns:
 ```go
-//encrypted:embed *.txt
+//encrypted:embed bin/* *.txt
 var glob encryptedfs.FS
 ```
 
@@ -66,13 +66,13 @@ var hello string
 
 Byte slices:
 ```go
-//encrypted:embed gopher.png
+//encrypted:embed bin/gopher.png
 var gopher []byte
 ```
 
 
 ## Caveats
-- locally scoped embed variables are not supported, because a seperate file is generated, which needs to manipulate the variables
+- locally scoped embed variables are not supported, in go1.19
 
 ```go
 func main() {
@@ -90,4 +90,14 @@ var (
 	gopher []byte
 )
 ```
-- no tests (will be added shortly)
+
+Пять `потому, что` в ответ на вопрос `почему я использую этот форк encrypted:embed вместо go:embed`
+ - даже без секретного ключа шифрования полезно шифровать исполняемые файлы в `embed` чтоб не беспокоить антивирусы и площадки где запрещена дистрибуция чужих бинарников
+ - даже без секретного ключа шифрования этот форк сохраняет и восстанавливает даты `embed` файлов
+ - этот форк может не включать ключ шифрования в `embed`
+ - в этом форке можно использовать `WalkDir`, `Xcopy`, `GlobStar`
+ - в этом форке ключ шифрования 
+ ```go
+ var key []byte
+ ```
+ может иметь имя отличное от `key`
