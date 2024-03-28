@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/abakum/embed-encrypt/encryptedfs"
 )
@@ -18,18 +18,18 @@ import (
 //encrypted:embed hello.txt
 var hello string
 
-//encrypted:embed bin/gopher.png
+//encrypted:embed image/gopher.png
 var gopher []byte
 
-//encrypted:embed hello.txt "another.txt" "with spaces .txt" bin/gopher.png
+//encrypted:embed hello.txt "another.txt" "with spaces .txt" image/gopher.png
 var multiplefiles encryptedfs.FS
 
-//encrypted:embed bin *.txt
+//encrypted:embed image *.txt
 var glob encryptedfs.FS
 
 func main() {
 	log.SetFlags(log.Lshortfile)
-	g, err := fs.ReadFile(glob, "bin/gopher.png")
+	g, err := fs.ReadFile(glob, "image/gopher.png")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func main() {
 		}
 		fi, _ := d.Info()
 		if !fi.IsDir() {
-			fmt.Println(fi.Mode(), fi.ModTime(), fi.Size(), path)
+			log.Println(fi.Mode(), fi.ModTime(), fi.Size(), path)
 		}
 		return nil
 	})
@@ -59,17 +59,21 @@ func main() {
 	//GlobStar test
 	log.Println(encryptedfs.GlobStar(glob, "."))
 
-	wd, err := os.Getwd()
+	wd, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
+	}
+	wd = filepath.Dir(wd)
 	if err == nil {
 		// https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/xcopy
-		// xcopy embed:\bin %CD%\copy\ /syd
-		log.Println(encryptedfs.Xcopy(glob, "bin", wd, "copy"))
-		// bin\gopher.png -> %CD%\u\bin\gopher.png
+		// xcopy embed:\image %CD%\copy\ /syd
+		log.Println(encryptedfs.Xcopy(glob, "image", wd, "copy"))
+		// image\gopher.png -> %CD%\copy\image\gopher.png
 
 		// xcopy embed:\. %CD%\copy\ /syd
 		log.Println(encryptedfs.Xcopy(glob, ".", wd, "copy"))
-		// another.txt -> %CD%\u\another.txt
-		// hello.txt -> %CD%\u\hello.txt
-		// "with spaces .txt" -> %CD%\u\"with spaces .txt"
+		// another.txt -> %CD%\copy\another.txt
+		// hello.txt -> %CD%\copy\hello.txt
+		// "with spaces .txt" -> %CD%\copy\"with spaces .txt"
 	}
 }

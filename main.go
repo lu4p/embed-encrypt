@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -74,6 +75,14 @@ func encryptFile(name string, key []byte) error {
 
 	defer f.Close()
 
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return nil
+	}
+
 	content, err := io.ReadAll(f)
 	if err != nil {
 		return err
@@ -91,11 +100,6 @@ func encryptFile(name string, key []byte) error {
 	nonce := make([]byte, encryptedfs.NONCE)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
 	}
 
 	// The go:embed does not store ModTime, let's fix it for encrypted:embed
@@ -228,23 +232,40 @@ func directives2Files(directives []directive) error {
 			info, err := os.Stat(p)
 			if err == nil {
 				if info.IsDir() {
-					p += "/*"
+					// https://pkg.go.dev/embed#hdr-Directives
+					// The difference is that ‘image/*’ embeds ‘image/.tempfile’ while ‘image’ does not.
+					filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+						if err != nil || d.IsDir() {
+							return nil
+						}
+						if base := filepath.Base(path); strings.HasPrefix(base, ".") || strings.HasPrefix(base, "_") || strings.HasSuffix(path, encryptedfs.ENC) {
+							return nil
+						}
+						directives[i].files = append(directives[i].files, strings.ReplaceAll(path, "\\", "/"))
+						return nil
+					})
+					continue
 				} else {
 					directives[i].files = append(directives[i].files, p)
 					continue
 				}
 			}
 			if os.IsNotExist(err) {
-				return fmt.Errorf("not found %s", p)
+				return fmt.Errorf("pattern %s: no matching files found", p)
 			}
 			matches, err := filepath.Glob(p)
 			if err != nil {
 				return err
 			}
 			for _, file := range matches {
-				if !strings.HasSuffix(file, encryptedfs.ENC) {
-					directives[i].files = append(directives[i].files, strings.ReplaceAll(file, "\\", "/"))
+				if strings.HasSuffix(file, encryptedfs.ENC) {
+					continue
 				}
+				info, err := os.Stat(file)
+				if err != nil || info.IsDir() {
+					continue
+				}
+				directives[i].files = append(directives[i].files, strings.ReplaceAll(file, "\\", "/"))
 			}
 		}
 	}

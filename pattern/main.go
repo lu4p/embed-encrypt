@@ -1,30 +1,30 @@
 package main
 
 import (
+	"embed"
 	"io/fs"
 	"log"
 
 	"github.com/abakum/embed-encrypt/encryptedfs"
 )
 
-//go:generate go run github.com/abakum/embed-encrypt random
-
 // try pass unexists file
 //
-// encrypted:embed unexists.txt
+// go:embed unexists.txt
 // var _ string
 
 // https://pkg.go.dev/embed#hdr-Directives
-// The difference is that ‘image/*’ embeds ‘image/.tempfile’ while ‘image’ does not.
+// The difference is that ‘image/*’ embeds ‘image/.tempfile’ while ‘image’ does not
+// and ‘image’ is recursive  but ‘image/*’ does not.
 //
-//encrypted:embed image
-var glob encryptedfs.FS
+//go:embed image
+var glob embed.FS
 
-//encrypted:embed image/* image/dir
-var glob2 encryptedfs.FS
+//go:embed image/* image/dir
+var glob2 embed.FS
 
-//encrypted:embed image/* image/dir/*
-var glob3 encryptedfs.FS
+//go:embed image/* image/dir/*
+var glob3 embed.FS
 
 func main() {
 	log.SetFlags(log.Lshortfile)

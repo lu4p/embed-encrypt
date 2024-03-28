@@ -1,7 +1,6 @@
 package encryptedfs
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,25 +16,8 @@ const (
 	timeBinaryVersionV2 = 2 // For LMT only
 )
 
-// `fs.WalkDir(encryptedfs` do not work replace it with `encryptedfs.WalkDir(`
 func (f FS) WalkDir(root string, fn fs.WalkDirFunc) error {
-	nfn := func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			path = remSuffix(path)
-		}
-		file, err := f.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		info, err := file.Stat()
-		return fn(path, info.(*fileInfo), err)
-	}
-	return fs.WalkDir(f.underlying, root, nfn)
+	return fs.WalkDir(f, root, fn)
 }
 
 func (f *fileInfo) String() string { return fs.FormatFileInfo(f) }
@@ -55,8 +37,7 @@ src="b" trg="" then will be `/tmp/b/c`
 
 src="b" trg="d" then will be `/tmp/d/b/c`
 */
-func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string, err error) {
-	var fsys fs.FS
+func Xcopy(bin fs.FS, src, root, trg string) (fns map[string]string, report string, err error) {
 	const (
 		FiLEMODE = 0644
 		DIRMODE  = 0755
@@ -74,7 +55,7 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 		}
 		path := filepath.Join(append(dirs, strings.Split(unix, "/")[srcLen:]...)...)
 		fns[strings.TrimPrefix(unix, src+"/")] = path
-		eInfo, _ := fs.Stat(fsys, unix)
+		eInfo, _ := fs.Stat(bin, unix)
 		fInfo, err := os.Stat(path)
 		ts := ""
 		if err == nil {
@@ -92,7 +73,7 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 			}
 			return err
 		}
-		bytes, err := fs.ReadFile(fsys, unix)
+		bytes, err := fs.ReadFile(bin, unix)
 		if err != nil {
 			return err
 		}
@@ -114,19 +95,12 @@ func Xcopy(bin any, src, root, trg string) (fns map[string]string, report string
 		report += fmt.Sprintln(eInfo.ModTime(), eInfo.Size(), unix, "->", ts, path)
 		return nil
 	}
-	switch efs := bin.(type) {
-	case embed.FS:
-		fsys = efs
-		err = fs.WalkDir(efs, src, write)
-	case FS:
-		fsys = efs
-		err = efs.WalkDir(src, write)
-	}
+	err = fs.WalkDir(bin, src, write)
 	return
 }
 
 // like src/** case shopt -s globstar
-func GlobStar(bin any, src string) (paths []string, err error) {
+func GlobStar(bin fs.FS, src string) (paths []string, err error) {
 	list := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -134,11 +108,6 @@ func GlobStar(bin any, src string) (paths []string, err error) {
 		paths = append(paths, path)
 		return nil
 	}
-	switch efs := bin.(type) {
-	case embed.FS:
-		err = fs.WalkDir(efs, src, list)
-	case FS:
-		err = efs.WalkDir(src, list)
-	}
+	err = fs.WalkDir(bin, src, list)
 	return
 }

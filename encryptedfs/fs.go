@@ -120,7 +120,12 @@ func (f FS) ReadDir(name string) ([]fs.DirEntry, error) {
 	newEntries := make([]fs.DirEntry, len(entries))
 
 	for i, entry := range entries {
-		file, err := f.Open(remSuffix(entry.Name()))
+		if entry.IsDir() {
+			newEntries[i] = entry
+			continue
+		}
+
+		file, err := f.Open(strings.TrimLeft(name+"/", "./") + remSuffix(entry.Name()))
 		if err != nil {
 			return nil, err
 		}
